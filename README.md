@@ -24,5 +24,5 @@ Box	                    $
 Box on goal square	    *
 Goal square	            .
 Floor	             (Space)
-"outside"               -
+Floor                   -
 ```

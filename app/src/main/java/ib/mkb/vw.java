@@ -39,7 +39,7 @@ public class vw extends View {
 
     public vw(final Context context) {
         super(context);
-        // todo: make this way tighter (3bit -> 8 tiles in 3 bytes)
+        // todo: load levels from file in assets
         loadLevel( 0, "----#####");
         loadLevel( 1, "----#---#");
         loadLevel( 2, "----#$--#");
@@ -51,7 +51,6 @@ public class vw extends View {
         loadLevel( 8, "#####-###-#@##--..#");
         loadLevel( 9, "----#-----#########");
         loadLevel(10, "----#######");
-
 
         // Check for dark mode.
         int uiMode = getResources().getConfiguration().uiMode;

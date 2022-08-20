@@ -3,26 +3,27 @@ package ib.mkb;
 import android.app.ActionBar;
 import android.app.Activity;
 import android.os.Bundle;
-import android.view.Window;
+import android.view.MotionEvent;
 
 public class ma extends Activity {
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
+    protected void onCreate(Bundle bundle) {
+        super.onCreate(bundle);
 
         // hide action bar
-        ActionBar titleBar = this.getActionBar();
-        if (titleBar != null) this.getActionBar().hide();
+        ActionBar bar = this.getActionBar();
+        if (bar != null) this.getActionBar().hide();
 
         // Make a new super-basic view and use it
-        vw basicView = new vw(this);
-        setContentView(basicView);
+        v = new vw(this);
+        setContentView(v);
+    }
+    private vw v;
 
-        // Intercept all events
-        final Window window = this.getWindow();
-        if (window == null) return;
-        th interactor = new th(window.getCallback(), basicView);
-        window.setCallback(interactor);
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        if (v != null) return v.TouchEvent(event);
+        return false;
     }
 }

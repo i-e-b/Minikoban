@@ -1,5 +1,8 @@
 package ib.mkb;
 
+import static android.content.res.Configuration.UI_MODE_NIGHT_NO;
+import static android.content.res.Configuration.UI_MODE_NIGHT_YES;
+
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Paint;
@@ -19,6 +22,7 @@ public class vw extends View {
 
     private boolean touchDown; // are we currently touching the screen?
     private boolean didScroll; // did we scroll with this touch? Prevents move on lift.
+    private boolean darkColors; // night mode if true.
 
     private static final int levelWidth = 20;
     private static final int levelHeight = 11;
@@ -47,6 +51,15 @@ public class vw extends View {
         loadLevel( 8, "#####-###-#@##--..#");
         loadLevel( 9, "----#-----#########");
         loadLevel(10, "----#######");
+
+
+        // Check for dark mode.
+        int uiMode = getResources().getConfiguration().uiMode;
+        if ((uiMode & UI_MODE_NIGHT_YES) > 0){
+            darkColors = true;
+        } else if ((uiMode & UI_MODE_NIGHT_NO) > 0){
+            darkColors = false;
+        }
 
         levelComplete = false;
         touchDown = false;
@@ -105,7 +118,16 @@ public class vw extends View {
 
     @Override
     public void onDrawForeground(final Canvas canvas) {
+        // clear background
+        if (darkColors){
+            canvas.drawARGB(255, 50,50,50);
+        } else {
+            canvas.drawARGB(255, 200,200,200);
+        }
+
         drawLevel(canvas);
+
+        // show crappy win screen. TODO: level transitions etc.
         if (levelComplete) {
             mPaint.setTextSize(200);
             canvas.drawText("WIN \uD83E\uDD38", 60, 200, mPaint);
@@ -177,6 +199,8 @@ public class vw extends View {
 
         if (xi == 1 && yi == 0) movePlayer(0, -1);
         if (xi == 1 && yi == 2) movePlayer(0, 1);
+
+        // TODO: have a reset button (should be tight bounds & have a visual)
     }
 
     private void movePlayer(int dx, int dy) {
@@ -261,7 +285,7 @@ public class vw extends View {
         float dy = touchY-moveY;
         float dist = (float)Math.sqrt((dx*dx)+(dy*dy));
 
-        if (dist < 100) return;
+        if (!didScroll && dist < 100) return;
 
         // look around the player
         didScroll = true;

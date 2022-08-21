@@ -4,10 +4,18 @@ import static android.content.res.Configuration.UI_MODE_NIGHT_NO;
 import static android.content.res.Configuration.UI_MODE_NIGHT_YES;
 
 import android.content.Context;
+import android.content.res.AssetManager;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.view.MotionEvent;
 import android.view.View;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.List;
 
 public class vw extends View {
 
@@ -24,9 +32,10 @@ public class vw extends View {
     private boolean didScroll; // did we scroll with this touch? Prevents move on lift.
     private boolean darkColors; // night mode if true.
 
-    private static final int levelWidth = 20;
-    private static final int levelHeight = 11;
-    private final byte[/*row*/][/*col*/] level = new byte[levelHeight][levelWidth];
+    private int currentLevel = 1;
+    private int levelWidth = 0;
+    private int levelHeight = 0;
+    private byte[/*row*/][/*col*/] level;
     private boolean levelComplete; // true once there are no tiles just box or just goal.
 
     // flags
@@ -36,21 +45,13 @@ public class vw extends View {
     private static final byte fBox = 1<<3;
 
     private static final int tileScale = 110; // size of tile grid (tune to fit font)
+    private final AssetManager assets;
 
-    public vw(final Context context) {
+    public vw(final Context context, AssetManager assets) {
         super(context);
-        // todo: load levels from file in assets
-        loadLevel( 0, "----#####");
-        loadLevel( 1, "----#---#");
-        loadLevel( 2, "----#$--#");
-        loadLevel( 3, "--###--$##");
-        loadLevel( 4, "--#--$-$-#");
-        loadLevel( 5, "###-#-##-#---######");
-        loadLevel( 6, "#---#-##-#####--..#");
-        loadLevel( 7, "#-$--$----------..#");
-        loadLevel( 8, "#####-###-#@##--..#");
-        loadLevel( 9, "----#-----#########");
-        loadLevel(10, "----#######");
+        this.assets = assets;
+        loadLevel(currentLevel);
+
 
         // Check for dark mode.
         int uiMode = getResources().getConfiguration().uiMode;
@@ -63,6 +64,50 @@ public class vw extends View {
         levelComplete = false;
         touchDown = false;
         mPaint.setAntiAlias(true);
+    }
+
+    // read in a level, indexed from zero
+    private void loadLevel(int levelNumber) {
+        try {
+        InputStream is = assets.open("levels.txt");
+        BufferedReader br = new BufferedReader(new InputStreamReader(is));
+
+        List<String> levelLines = new ArrayList<>();
+        String readLine;
+        int foundLevel=0;
+        int maxWidth = 0;
+
+            // While the BufferedReader readLine is not null
+            while ((readLine = br.readLine()) != null) {
+                if (foundLevel > levelNumber) break;
+                if (readLine.equals("")){
+                    foundLevel++;
+                }
+                else if (foundLevel == levelNumber) {
+                    levelLines.add(readLine);
+                    if (readLine.length() > maxWidth) maxWidth = readLine.length();
+                }
+            }
+
+            // Close the InputStream and BufferedReader
+            is.close();
+            br.close();
+
+        // build the array and populate
+        levelWidth = maxWidth;
+        levelHeight = levelLines.size();
+        level = new byte[levelHeight][levelWidth];
+
+        for (int i=0; i<levelHeight; i++)
+        {
+            loadLevel( i, levelLines.get(i));
+        }
+    } catch (Exception e) {
+        levelWidth = 5; // bonus "broken" level
+        levelHeight = 1;
+        level = new byte[levelHeight][levelWidth];
+        loadLevel( 0, "#@$.#");
+    }
     }
 
     private void loadLevel(int row, String s) {
@@ -132,6 +177,11 @@ public class vw extends View {
             canvas.drawText("WIN \uD83E\uDD38", 60, 200, mPaint);
         }
 
+        // draw reset level button
+        mPaint.setTextSize(150);
+        canvas.drawText("\uD83D\uDD19", 0, 150, mPaint);
+
+        // drift toward being centred on player if not dragging
         if ((!touchDown) && (Math.abs(px - vx) > 0.01f || Math.abs(py - vy) > 0.01f)) {
             // view is not aligned to player. drift in
             float dx = (px - vx) / 3.0f;
@@ -140,22 +190,6 @@ public class vw extends View {
             vy+=dy;
             invalidate(); // draw a frame
         }
-        /*
-        stand  "\uD83E\uDDCD";
-        brick  "\uD83E\uDDF1";
-        cartwheel  "\uD83E\uDD38";
-
-        run  "\uD83C\uDFC3";
-        fog  "\uD83C\uDF2B️";
-
-        box  "\uD83D\uDCE6";
-        gem  "\uD83D\uDC8E";
-        diamond  "\uD83D\uDD37";
-        hole  "\uD83D\uDD73";
-        walk  "\uD83D\uDEB6";
-        block  "\uD83D\uDEA7";
-        purple  "\uD83D\uDFEA";
-        */
     }
 
     public boolean TouchEvent(final MotionEvent event) {
@@ -199,7 +233,13 @@ public class vw extends View {
         if (xi == 1 && yi == 0) movePlayer(0, -1);
         if (xi == 1 && yi == 2) movePlayer(0, 1);
 
-        // TODO: have a reset button (should be tight bounds & have a visual)
+        // chop into fifths for small controls
+        xi = (int)((upX*5) / lastWidth);
+        yi = (int)((upY*5) / lastHeight);
+        if (xi <= 0 && yi <= 0){
+            // pressed reset button
+            loadLevel(currentLevel);
+        }
     }
 
     private void movePlayer(int dx, int dy) {

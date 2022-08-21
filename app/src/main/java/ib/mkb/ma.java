@@ -2,6 +2,7 @@ package ib.mkb;
 
 import android.app.ActionBar;
 import android.app.Activity;
+import android.content.Context;
 import android.os.Bundle;
 import android.view.MotionEvent;
 
@@ -16,7 +17,7 @@ public class ma extends Activity {
         if (bar != null) this.getActionBar().hide();
 
         // Make a new super-basic view and use it
-        v = new vw(this);
+        v = new vw(this, getAssets());
         setContentView(v);
     }
     private vw v;

@@ -2,12 +2,9 @@ package ib.mkb;
 
 import android.app.ActionBar;
 import android.app.Activity;
-import android.content.Context;
 import android.os.Bundle;
-import android.view.MotionEvent;
 
-public class ma extends Activity {
-
+public class Main extends Activity {
     @Override
     protected void onCreate(Bundle bundle) {
         super.onCreate(bundle);
@@ -17,14 +14,16 @@ public class ma extends Activity {
         if (bar != null) this.getActionBar().hide();
 
         // Make a new super-basic view and use it
-        v = new vw(this, getAssets());
+        showSelectionScreen();
+    }
+
+    public void switchToLevel(int level){
+        Level v = new Level(this, getAssets(), level);
         setContentView(v);
     }
-    private vw v;
 
-    @Override
-    public boolean onTouchEvent(MotionEvent event) {
-        if (v != null) return v.TouchEvent(event);
-        return false;
+    public void showSelectionScreen() {
+        Select v = new Select(this);
+        setContentView(v);
     }
 }

@@ -3,21 +3,21 @@ package ib.mkb;
 import static android.content.res.Configuration.UI_MODE_NIGHT_NO;
 import static android.content.res.Configuration.UI_MODE_NIGHT_YES;
 
-import android.content.Context;
+import android.annotation.SuppressLint;
 import android.content.res.AssetManager;
 import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.graphics.Rect;
 import android.view.MotionEvent;
 import android.view.View;
 
 import java.io.BufferedReader;
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 
-public class vw extends View {
+public class Level extends View {
 
     private final Paint mPaint = new Paint();
     private int lastHeight, lastWidth; // dimensions of screen last time we did a paint.
@@ -46,10 +46,13 @@ public class vw extends View {
 
     private static final int tileScale = 110; // size of tile grid (tune to fit font)
     private final AssetManager assets;
+    private final Main parent;
 
-    public vw(final Context context, AssetManager assets) {
+    public Level(final Main context, AssetManager assets, int selectedLevel) {
         super(context);
         this.assets = assets;
+        parent = context;
+        currentLevel = selectedLevel;
         loadLevel(currentLevel);
 
 
@@ -133,11 +136,77 @@ public class vw extends View {
         }
     }
 
-    public void drawLevel(final Canvas canvas){
-        mPaint.setTextSize(100);
-
+    @Override
+    public void onDrawForeground(final Canvas canvas) {
         lastWidth = canvas.getWidth();
         lastHeight = canvas.getHeight();
+
+        // clear background
+        if (darkColors){
+            canvas.drawARGB(255, 50,50,50);
+            mPaint.setARGB(255, 70,70,70);
+        } else {
+            canvas.drawARGB(255, 200,200,200);
+            mPaint.setARGB(255, 220,220,220);
+        }
+
+        drawMotionHints(canvas);
+        drawLevel(canvas);
+        drawGeneralControls(canvas);
+
+        if (darkColors){
+            mPaint.setARGB(255, 220,220,220);
+        } else {
+            mPaint.setARGB(255, 70,70,70);
+        }
+
+        if (levelComplete) {
+            mPaint.setTextSize(200);
+            Rect rect = new Rect();
+            mPaint.getTextBounds("WIN \uD83E\uDD38", 0,2, rect);
+            float h = (lastHeight - rect.bottom - rect.top) / 2.0f;
+            float w = (lastWidth - rect.right - rect.left) / 2.0f;
+            canvas.drawText("WIN \uD83E\uDD38", w, h, mPaint);
+        }
+
+
+        // drift toward being centred on player if not dragging
+        if ((!touchDown) && (Math.abs(px - vx) > 0.01f || Math.abs(py - vy) > 0.01f)) {
+            // view is not aligned to player. drift in
+            float dx = (px - vx) / 3.0f;
+            float dy = (py - vy) / 3.0f;
+            vx+=dx;
+            vy+=dy;
+            invalidate(); // draw a frame
+        }
+    }
+
+    private void drawGeneralControls(Canvas canvas){
+        mPaint.setTextSize(150);
+        Rect rect = new Rect();
+
+        // draw reset level button
+        mPaint.getTextBounds("\uD83D\uDD19", 0,2, rect);
+        float h = rect.bottom - rect.top;
+        canvas.drawText("\uD83D\uDD19", 0, h, mPaint);
+
+        // level select button
+        mPaint.getTextBounds("\uD83D\uDD22", 0,2, rect);
+        h = rect.bottom - rect.top;
+        canvas.drawText("\uD83D\uDD22", lastWidth-rect.right, h, mPaint);
+    }
+
+    private void drawMotionHints(Canvas canvas) {
+        float w3 = lastWidth / 3.0f;
+        float h3 = lastHeight / 3.0f;
+        canvas.drawRect(0, h3, w3,2*h3, mPaint); // L
+        canvas.drawRect(2*w3, h3, 3*w3,2*h3, mPaint); // R
+        canvas.drawRect(w3, 0, 2*w3,h3, mPaint); // U
+        canvas.drawRect(w3, 2*h3, 2*w3,3*h3, mPaint); // D
+    }
+
+    public void drawLevel(final Canvas canvas){
+        mPaint.setTextSize(100);
 
         int cx = lastWidth / 2;
         int cy = lastHeight / 2;
@@ -160,55 +229,26 @@ public class vw extends View {
         if ((flags&fWall)>0) canvas.drawText("\uD83E\uDDF1", x, y, mPaint);
     }
 
+
+    @SuppressLint("ClickableViewAccessibility")
     @Override
-    public void onDrawForeground(final Canvas canvas) {
-        // clear background
-        if (darkColors){
-            canvas.drawARGB(255, 50,50,50);
-        } else {
-            canvas.drawARGB(255, 200,200,200);
-        }
-
-        drawLevel(canvas);
-
-        // show crappy win screen. TODO: level transitions etc.
-        if (levelComplete) {
-            mPaint.setTextSize(200);
-            canvas.drawText("WIN \uD83E\uDD38", 60, 200, mPaint);
-        }
-
-        // draw reset level button
-        mPaint.setTextSize(150);
-        canvas.drawText("\uD83D\uDD19", 0, 150, mPaint);
-
-        // drift toward being centred on player if not dragging
-        if ((!touchDown) && (Math.abs(px - vx) > 0.01f || Math.abs(py - vy) > 0.01f)) {
-            // view is not aligned to player. drift in
-            float dx = (px - vx) / 3.0f;
-            float dy = (py - vy) / 3.0f;
-            vx+=dx;
-            vy+=dy;
-            invalidate(); // draw a frame
-        }
-    }
-
-    public boolean TouchEvent(final MotionEvent event) {
+    public boolean onTouchEvent(MotionEvent event) {
         switch (event.getAction()) {
             case MotionEvent.ACTION_DOWN:
                 touchDown = true;
                 didScroll = false;
-                touchX = event.getAxisValue(0);
-                touchY = event.getAxisValue(1);
+                touchX = event.getX();
+                touchY = event.getY();
                 break;
             case MotionEvent.ACTION_MOVE:
-                moveX = event.getAxisValue(0);
-                moveY = event.getAxisValue(1);
+                moveX = event.getX();
+                moveY = event.getY();
                 touchMoved();
                 break;
             case MotionEvent.ACTION_UP:
                 touchDown = false;
-                upX = event.getAxisValue(0);
-                upY = event.getAxisValue(1);
+                upX = event.getX();
+                upY = event.getY();
                 touchLift();
                 break;
             default:
@@ -222,23 +262,31 @@ public class vw extends View {
         // if we didn't scroll, then see what side of the player we tapped. move, check state etc.
         if (didScroll) return;
 
+        float w3 = lastWidth / 3.0f;
+        float h3 = lastHeight / 3.0f;
         // split screen into 9 like #
         // centre and corners do nothing (to save ambiguous inputs)
-        int xi = (int)((upX*3) / lastWidth);
-        int yi = (int)((upY*3) / lastHeight);
 
-        if (xi == 0 && yi == 1) movePlayer(-1, 0);
-        if (xi == 2 && yi == 1) movePlayer(1, 0);
+        if (upY >= h3 && upY <= 2*h3) {
+            if (upX <= w3) movePlayer(-1, 0);
+            if (upX >= 2*w3) movePlayer(1, 0);
+        }
 
-        if (xi == 1 && yi == 0) movePlayer(0, -1);
-        if (xi == 1 && yi == 2) movePlayer(0, 1);
+        if (upX >= w3 && upX <= 2*w3) {
+            if (upY <= h3) movePlayer(0, -1);
+            if (upY >= 2*h3) movePlayer(0, 1);
+        }
 
         // chop into fifths for small controls
-        xi = (int)((upX*5) / lastWidth);
-        yi = (int)((upY*5) / lastHeight);
-        if (xi <= 0 && yi <= 0){
+        float minDim = Math.min(lastWidth, lastHeight) / 5.0f;
+        if (upX <= minDim && upY <= minDim){
             // pressed reset button
             loadLevel(currentLevel);
+        }
+
+        if (upX >= lastWidth - minDim && upY <= minDim){
+            // pressed level select button
+            parent.showSelectionScreen();
         }
     }
 

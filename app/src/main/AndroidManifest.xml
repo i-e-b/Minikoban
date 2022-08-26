@@ -10,7 +10,7 @@
         a:supportsRtl="true"
         t:targetApi="31">
         <activity
-            a:name=".ma"
+            a:name=".Main"
             a:exported="true">
             <intent-filter>
                 <action a:name="android.intent.action.MAIN" />

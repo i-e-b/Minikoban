@@ -4,6 +4,8 @@ import static android.content.res.Configuration.UI_MODE_NIGHT_NO;
 import static android.content.res.Configuration.UI_MODE_NIGHT_YES;
 
 import android.annotation.SuppressLint;
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Rect;
@@ -25,6 +27,9 @@ public class Select extends View {
     public Select(final Main context) {
         super(context);
         parent = context;
+
+        SharedPreferences pref = parent.getSharedPreferences("scores", Context.MODE_PRIVATE);
+        selectedLevel = pref.getInt("lastLvl", 0);
 
         // Check for dark mode.
         int uiMode = getResources().getConfiguration().uiMode;
@@ -64,10 +69,12 @@ public class Select extends View {
         float w = (lastWidth - rect.right - rect.left) / 2.0f;
         canvas.drawText(txt, w, h, mPaint);
 
+        // Level number
         txt = ""+(selectedLevel+1);
-        mPaint.getTextBounds(txt, 0,txt.length(), rect);
+        mPaint.getTextBounds(txt, 0, txt.length(), rect);
         h = (lastHeight - rect.bottom - rect.top) / 2.0f;
         w = (lastWidth - rect.right - rect.left) / 2.0f;
+        float subH = h + rect.height();
         canvas.drawText(txt, w, h, mPaint);
 
         // down arrow (next level)
@@ -77,6 +84,18 @@ public class Select extends View {
         w = (lastWidth - rect.right - rect.left) / 2.0f;
         canvas.drawText(txt, w, lastHeight - h, mPaint);
 
+        // get best score (if any)
+        mPaint.setTextSize(80);
+        SharedPreferences pref = parent.getSharedPreferences("scores", Context.MODE_PRIVATE);
+        String levelName = ""+selectedLevel;
+        int best = pref.getInt(levelName, 0);
+        txt = "Not beaten yet";
+        if (best > 0){
+            txt = "Best score: "+best;
+        }
+        mPaint.getTextBounds(txt, 0, txt.length(), rect);
+        w = (lastWidth - rect.right - rect.left) / 2.0f;
+        canvas.drawText(txt, w, subH, mPaint);
     }
 
 
@@ -105,5 +124,11 @@ public class Select extends View {
         }
         if (selectedLevel < 0) selectedLevel = 0;
         if (selectedLevel > 96) selectedLevel = 96;
+
+        // save the preference
+        SharedPreferences pref = parent.getSharedPreferences("scores", Context.MODE_PRIVATE);
+        SharedPreferences.Editor e = pref.edit();
+        e.putInt("lastLvl", selectedLevel);
+        e.apply();
     }
 }

@@ -4,6 +4,8 @@ import static android.content.res.Configuration.UI_MODE_NIGHT_NO;
 import static android.content.res.Configuration.UI_MODE_NIGHT_YES;
 
 import android.annotation.SuppressLint;
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.res.AssetManager;
 import android.graphics.Canvas;
 import android.graphics.Paint;
@@ -32,11 +34,12 @@ public class Level extends View {
     private boolean didScroll; // did we scroll with this touch? Prevents move on lift.
     private boolean darkColors; // night mode if true.
 
-    private int currentLevel = 1;
+    private final int currentLevel;
     private int levelWidth = 0;
     private int levelHeight = 0;
     private byte[/*row*/][/*col*/] level;
     private boolean levelComplete; // true once there are no tiles just box or just goal.
+    private int moves = 0;
 
     // flags
     private static final byte fWall = 1;
@@ -72,21 +75,21 @@ public class Level extends View {
     // read in a level, indexed from zero
     private void loadLevel(int levelNumber) {
         try {
-        InputStream is = assets.open("levels.txt");
-        BufferedReader br = new BufferedReader(new InputStreamReader(is));
+            moves = 0;
+            InputStream is = assets.open("levels.txt");
+            BufferedReader br = new BufferedReader(new InputStreamReader(is));
 
-        List<String> levelLines = new ArrayList<>();
-        String readLine;
-        int foundLevel=0;
-        int maxWidth = 0;
+            List<String> levelLines = new ArrayList<>();
+            String readLine;
+            int foundLevel = 0;
+            int maxWidth = 0;
 
             // While the BufferedReader readLine is not null
             while ((readLine = br.readLine()) != null) {
                 if (foundLevel > levelNumber) break;
-                if (readLine.equals("")){
+                if (readLine.equals("")) {
                     foundLevel++;
-                }
-                else if (foundLevel == levelNumber) {
+                } else if (foundLevel == levelNumber) {
                     levelLines.add(readLine);
                     if (readLine.length() > maxWidth) maxWidth = readLine.length();
                 }
@@ -96,21 +99,20 @@ public class Level extends View {
             is.close();
             br.close();
 
-        // build the array and populate
-        levelWidth = maxWidth;
-        levelHeight = levelLines.size();
-        level = new byte[levelHeight][levelWidth];
+            // build the array and populate
+            levelWidth = maxWidth;
+            levelHeight = levelLines.size();
+            level = new byte[levelHeight][levelWidth];
 
-        for (int i=0; i<levelHeight; i++)
-        {
-            loadLevel( i, levelLines.get(i));
+            for (int i = 0; i < levelHeight; i++) {
+                loadLevel(i, levelLines.get(i));
+            }
+        } catch (Exception e) {
+            levelWidth = 5; // bonus "broken" level
+            levelHeight = 1;
+            level = new byte[levelHeight][levelWidth];
+            loadLevel(0, "#@$.#");
         }
-    } catch (Exception e) {
-        levelWidth = 5; // bonus "broken" level
-        levelHeight = 1;
-        level = new byte[levelHeight][levelWidth];
-        loadLevel( 0, "#@$.#");
-    }
     }
 
     private void loadLevel(int row, String s) {
@@ -160,13 +162,18 @@ public class Level extends View {
             mPaint.setARGB(255, 70,70,70);
         }
 
+        // draw move count
+        mPaint.setTextSize(50);
+        canvas.drawText(moves+" moves", 10, lastHeight - 50, mPaint);
+
         if (levelComplete) {
-            mPaint.setTextSize(200);
+            mPaint.setTextSize(300);
             Rect rect = new Rect();
-            mPaint.getTextBounds("WIN \uD83E\uDD38", 0,2, rect);
+            String msg = "WIN \uD83E\uDD38";
+            mPaint.getTextBounds(msg, 0,msg.length(), rect);
             float h = (lastHeight - rect.bottom - rect.top) / 2.0f;
             float w = (lastWidth - rect.right - rect.left) / 2.0f;
-            canvas.drawText("WIN \uD83E\uDD38", w, h, mPaint);
+            canvas.drawText(msg, w, h, mPaint);
         }
 
 
@@ -350,6 +357,8 @@ public class Level extends View {
         level[py][px] &= ~fBox;             // remove box from old position
         level[newBoxY][newBoxX] |= fBox;    // add box to new position
 
+        moves++;
+
         checkLevelState();
     }
 
@@ -363,6 +372,18 @@ public class Level extends View {
                     return;
                 }
             }
+        }
+
+        // level was completed. Update best score if needed
+        String levelKey = ""+currentLevel;
+        SharedPreferences pref = parent.getSharedPreferences("scores", Context.MODE_PRIVATE);
+        int best = pref.getInt(levelKey, 0);
+
+        if (best < 1 || moves < best) { // yay! Best score.
+            // save the preference
+            SharedPreferences.Editor e = pref.edit();
+            e.putInt(levelKey, moves);
+            e.apply();
         }
     }
 

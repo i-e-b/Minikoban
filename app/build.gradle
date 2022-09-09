@@ -3,6 +3,20 @@ plugins {
 }
 
 android {
+    signingConfigs {
+        release {
+            keyAlias 'key0'
+            keyPassword 'android'
+            storePassword 'android'
+            storeFile file("/testkeys.jks")
+        }
+        debug {
+            storeFile file("/testkeys.jks")
+            keyAlias 'key0'
+            keyPassword 'android'
+            storePassword 'android'
+        }
+    }
     compileSdk 32
 
     defaultConfig {
@@ -11,13 +25,21 @@ android {
         targetSdk 32
         versionCode 1
         versionName "1.0"
-
-        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
         release {
-            minifyEnabled false
+            signingConfig signingConfigs.release
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            aaptOptions.cruncherEnabled = true
+            ext.alwaysUpdateBuildId = false
+
+            minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }

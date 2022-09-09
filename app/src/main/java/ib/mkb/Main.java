@@ -2,6 +2,8 @@ package ib.mkb;
 
 import android.app.ActionBar;
 import android.app.Activity;
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 
 public class Main extends Activity {

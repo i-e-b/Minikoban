@@ -10,6 +10,7 @@ import android.graphics.Rect;
 import android.view.MotionEvent;
 import android.view.View;
 
+@SuppressLint("ViewConstructor")
 public class Select extends View {
     private final Paint mPaint = new Paint();
     private final Main parent;

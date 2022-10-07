@@ -4,6 +4,8 @@ import android.app.ActionBar;
 import android.app.Activity;
 import android.os.Bundle;
 
+// TODO: base class for the two views that does touch and draw common stuff.
+
 public class Main extends Activity {
     @Override
     protected void onCreate(Bundle bundle) {

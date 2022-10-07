@@ -19,10 +19,11 @@ import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 
+@SuppressLint("ViewConstructor")
 public class Level extends View {
 
     private final Paint mPaint = new Paint();
-    private int lastHeight, lastWidth; // dimensions of screen last time we did a paint.
+    private int lastHeight, lastWidth, minDim; // dimensions of screen last time we did a paint.
 
     private int px,py; // player position
     private float vx,vy; // view position (should move toward player)
@@ -142,34 +143,30 @@ public class Level extends View {
     public void onDrawForeground(final Canvas canvas) {
         lastWidth = canvas.getWidth();
         lastHeight = canvas.getHeight();
+        minDim = Math.min(lastWidth, lastHeight);
 
+        int c1 = 200, c2 = 220, c3 = 70;
         // clear background
         if (darkColors){
-            canvas.drawARGB(255, 50,50,50);
-            mPaint.setARGB(255, 70,70,70);
-        } else {
-            canvas.drawARGB(255, 200,200,200);
-            mPaint.setARGB(255, 220,220,220);
+            c1 = 50; c2 = 70; c3 = 220;
         }
+        canvas.drawARGB(255, c1,c1,c1);
+        mPaint.setARGB(255, c2,c2,c2);
 
         drawMotionHints(canvas);
         drawLevel(canvas);
         drawGeneralControls(canvas);
 
-        if (darkColors){
-            mPaint.setARGB(255, 220,220,220);
-        } else {
-            mPaint.setARGB(255, 70,70,70);
-        }
+        mPaint.setARGB(255, c3,c3,c3);
 
         // draw move count
         mPaint.setTextSize(50);
         canvas.drawText(moves+" moves", 10, lastHeight - 50, mPaint);
 
         if (levelComplete) {
-            mPaint.setTextSize(300);
+            mPaint.setTextSize(450);
             Rect rect = new Rect();
-            String msg = "WIN \uD83E\uDD38";
+            String msg = "\uD83E\uDD38";
             mPaint.getTextBounds(msg, 0,msg.length(), rect);
             float h = (lastHeight - rect.bottom - rect.top) / 2.0f;
             float w = (lastWidth - rect.right - rect.left) / 2.0f;
@@ -180,10 +177,8 @@ public class Level extends View {
         // drift toward being centred on player if not dragging
         if ((!touchDown) && (Math.abs(px - vx) > 0.01f || Math.abs(py - vy) > 0.01f)) {
             // view is not aligned to player. drift in
-            float dx = (px - vx) / 3.0f;
-            float dy = (py - vy) / 3.0f;
-            vx+=dx;
-            vy+=dy;
+            vx+= (px - vx) / 3.0f;
+            vy+= (py - vy) / 3.0f;
             invalidate(); // draw a frame
         }
     }
@@ -204,12 +199,15 @@ public class Level extends View {
     }
 
     private void drawMotionHints(Canvas canvas) {
-        float w3 = lastWidth / 3.0f;
-        float h3 = lastHeight / 3.0f;
-        canvas.drawRect(0, h3, w3,2*h3, mPaint); // L
-        canvas.drawRect(2*w3, h3, 3*w3,2*h3, mPaint); // R
-        canvas.drawRect(w3, 0, 2*w3,h3, mPaint); // U
-        canvas.drawRect(w3, 2*h3, 2*w3,3*h3, mPaint); // D
+        float scale = minDim / 6.0f;
+        float wl = (lastWidth / 2.0f) - scale;
+        float wr = (lastWidth / 2.0f) + scale;
+        float ht = (lastHeight / 2.0f) - scale;
+        float hb = (lastHeight / 2.0f) + scale;
+        canvas.drawRect(0, ht, wl,hb, mPaint); // L
+        canvas.drawRect(wr, ht, lastWidth,hb, mPaint); // R
+        canvas.drawRect(wl, 0, wr,ht, mPaint); // U
+        canvas.drawRect(wl, hb, wr,lastHeight, mPaint); // D
     }
 
     public void drawLevel(final Canvas canvas){
@@ -220,10 +218,10 @@ public class Level extends View {
 
         for (int y=0; y < levelHeight; y++){
             for (int x=0; x < levelWidth; x++){
-                // draw level centred around the view point as grid coords
+                // draw level centred around the view point as grid co-ords
                 // view will drift toward player over time
-                float tx = cx + ((x - vx) * tileScale);
-                float ty = cy + ((y - vy) * tileScale);
+                float tx = cx + ((x - vx - 0.5f) * tileScale);
+                float ty = cy + ((y - vy + 0.25f) * tileScale);
                 drawStack(level[y][x], tx,ty, canvas);
             }
         }
@@ -269,19 +267,23 @@ public class Level extends View {
         // if we didn't scroll, then see what side of the player we tapped. move, check state etc.
         if (didScroll) return;
 
-        float w3 = lastWidth / 3.0f;
-        float h3 = lastHeight / 3.0f;
+        float scale = minDim / 6.0f;
+        float wl = (lastWidth / 2.0f) - scale;
+        float wr = (lastWidth / 2.0f) + scale;
+        float ht = (lastHeight / 2.0f) - scale;
+        float hb = (lastHeight / 2.0f) + scale;
+
         // split screen into 9 like #
         // centre and corners do nothing (to save ambiguous inputs)
 
-        if (upY >= h3 && upY <= 2*h3) {
-            if (upX <= w3) movePlayer(-1, 0);
-            if (upX >= 2*w3) movePlayer(1, 0);
+        if (upY >= ht && upY <= hb) {
+            if (upX <= wl) movePlayer(-1, 0);
+            if (upX >= wr) movePlayer(1, 0);
         }
 
-        if (upX >= w3 && upX <= 2*w3) {
-            if (upY <= h3) movePlayer(0, -1);
-            if (upY >= 2*h3) movePlayer(0, 1);
+        if (upX >= wl && upX <= wr) {
+            if (upY <= ht) movePlayer(0, -1);
+            if (upY >= hb) movePlayer(0, 1);
         }
 
         // chop into fifths for small controls
@@ -322,6 +324,7 @@ public class Level extends View {
             level[py][px] &= ~fPlayer; // remove from old position
             px+=dx; py+=dy;
             level[py][px] |= fPlayer; // add to new position
+            moves++;
             return;
         }
 
@@ -397,7 +400,7 @@ public class Level extends View {
 
         // look around the player
         didScroll = true;
-        vx = px + (dx / tileScale);
-        vy = py + (dy / tileScale);
+        vx = px + (dx / tileScale)*2;
+        vy = py + (dy / tileScale)*2;
     }
 }

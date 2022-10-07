@@ -8,10 +8,10 @@ android {
             keyAlias 'key0'
             keyPassword 'android'
             storePassword 'android'
-            storeFile file("/testkeys.jks")
+            storeFile file('/home/iain/code/Minikoban/app/testkeys.jks')
         }
         debug {
-            storeFile file("/testkeys.jks")
+            storeFile file('/home/iain/code/Minikoban/app/testkeys.jks')
             keyAlias 'key0'
             keyPassword 'android'
             storePassword 'android'

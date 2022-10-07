@@ -12,6 +12,7 @@ import android.graphics.Rect;
 import android.view.MotionEvent;
 import android.view.View;
 
+@SuppressLint("ViewConstructor")
 public class Select extends View {
     private final Paint mPaint = new Paint();
     private final Main parent;
@@ -47,18 +48,15 @@ public class Select extends View {
         lastWidth = canvas.getWidth();
         lastHeight = canvas.getHeight();
 
+
+        int c1 = 200, c3 = 70;
         // clear background
         if (darkColors){
-            canvas.drawARGB(255, 50,50,50);
-        } else {
-            canvas.drawARGB(255, 200,200,200);
+            c1 = 50; c3 = 220;
         }
+        canvas.drawARGB(255, c1,c1,c1);
+        mPaint.setARGB(255, c3,c3,c3);
 
-        if (darkColors){
-            mPaint.setARGB(255, 220,220,220);
-        } else {
-            mPaint.setARGB(255, 70,70,70);
-        }
         Rect rect = new Rect();
         mPaint.setTextSize(400);
 

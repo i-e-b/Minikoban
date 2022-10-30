@@ -1,11 +1,6 @@
 package ib.mkb;
 
-import static android.content.res.Configuration.UI_MODE_NIGHT_NO;
-import static android.content.res.Configuration.UI_MODE_NIGHT_YES;
-
 import android.annotation.SuppressLint;
-import android.content.Context;
-import android.content.SharedPreferences;
 import android.content.res.AssetManager;
 import android.graphics.Canvas;
 import android.graphics.Paint;
@@ -22,6 +17,15 @@ import java.util.List;
 @SuppressLint("ViewConstructor")
 public class Level extends View {
 
+    public static final String NumberButtonChr = "\uD83D\uDD22";
+    public static final String GoalChr = "\uD83D\uDD73";
+    public static final String BoxChr = "\uD83D\uDCE6";
+    public static final String PlayerChr = "\uD83E\uDDCD";
+    public static final String WallChr = "\uD83E\uDDF1";
+    public static final String DancingPlayerChr = "\uD83E\uDD38";
+    public static final String RestartButtonChr = "\uD83D\uDD04";
+    public static final String UndoButtonChr = "↩️";
+
     private final Paint mPaint = new Paint();
     private int lastHeight, lastWidth, minDim; // dimensions of screen last time we did a paint.
 
@@ -33,13 +37,15 @@ public class Level extends View {
 
     private boolean touchDown; // are we currently touching the screen?
     private boolean didScroll; // did we scroll with this touch? Prevents move on lift.
-    private boolean darkColors; // night mode if true.
+    private final boolean darkColors; // night mode if true.
 
     private final int currentLevel;
     private int levelWidth = 0;
     private int levelHeight = 0;
-    private byte[/*row*/][/*col*/] level;
+    private byte[/*row*/][/*col*/] level; // the current level
+    private byte[/*row*/][/*col*/] undo; // one step back
     private boolean levelComplete; // true once there are no tiles just box or just goal.
+    private boolean undoUsedUp; // did we just undo (switches undo button to restart button)
     private int moves = 0;
 
     // flags
@@ -59,15 +65,7 @@ public class Level extends View {
         currentLevel = selectedLevel;
         loadLevel(currentLevel);
 
-
-        // Check for dark mode.
-        int uiMode = getResources().getConfiguration().uiMode;
-        if ((uiMode & UI_MODE_NIGHT_YES) > 0){
-            darkColors = true;
-        } else if ((uiMode & UI_MODE_NIGHT_NO) > 0){
-            darkColors = false;
-        }
-
+        darkColors = (os.isDarkMode(this));
         levelComplete = false;
         touchDown = false;
         mPaint.setAntiAlias(true);
@@ -77,6 +75,7 @@ public class Level extends View {
     private void loadLevel(int levelNumber) {
         try {
             moves = 0;
+            undoUsedUp = true;
             InputStream is = assets.open("levels.txt");
             BufferedReader br = new BufferedReader(new InputStreamReader(is));
 
@@ -104,15 +103,19 @@ public class Level extends View {
             levelWidth = maxWidth;
             levelHeight = levelLines.size();
             level = new byte[levelHeight][levelWidth];
+            undo = new byte[levelHeight][levelWidth];
 
             for (int i = 0; i < levelHeight; i++) {
                 loadLevel(i, levelLines.get(i));
             }
+            copyUndo();
         } catch (Exception e) {
             levelWidth = 5; // bonus "broken" level
             levelHeight = 1;
             level = new byte[levelHeight][levelWidth];
+            undo = new byte[levelHeight][levelWidth];
             loadLevel(0, "#@$.#");
+            copyUndo();
         }
     }
 
@@ -141,6 +144,7 @@ public class Level extends View {
 
     @Override
     public void onDrawForeground(final Canvas canvas) {
+        Paint p = mPaint;
         lastWidth = canvas.getWidth();
         lastHeight = canvas.getHeight();
         minDim = Math.min(lastWidth, lastHeight);
@@ -151,26 +155,26 @@ public class Level extends View {
             c1 = 50; c2 = 70; c3 = 220;
         }
         canvas.drawARGB(255, c1,c1,c1);
-        mPaint.setARGB(255, c2,c2,c2);
+        os.setGrey(p, c2);
 
         drawMotionHints(canvas);
         drawLevel(canvas);
         drawGeneralControls(canvas);
 
-        mPaint.setARGB(255, c3,c3,c3);
+        os.setGrey(p, c3);
 
         // draw move count
-        mPaint.setTextSize(50);
-        canvas.drawText(moves+" moves", 10, lastHeight - 50, mPaint);
+        os.setSize(p, 50);
+        os.drawText(canvas, moves+" moves", 10, lastHeight - 50, p);
 
         if (levelComplete) {
-            mPaint.setTextSize(450);
+            os.setSize(p, 450);
             Rect rect = new Rect();
-            String msg = "\uD83E\uDD38";
-            mPaint.getTextBounds(msg, 0,msg.length(), rect);
+            String msg = DancingPlayerChr;
+            os.measureText(p, msg, rect);
             float h = (lastHeight - rect.bottom - rect.top) / 2.0f;
             float w = (lastWidth - rect.right - rect.left) / 2.0f;
-            canvas.drawText(msg, w, h, mPaint);
+            os.drawText(canvas, msg, w, h, p);
         }
 
 
@@ -183,35 +187,45 @@ public class Level extends View {
         }
     }
 
+
     private void drawGeneralControls(Canvas canvas){
-        mPaint.setTextSize(150);
+        os.setSize(mPaint, 150);
         Rect rect = new Rect();
 
         // draw reset level button
-        mPaint.getTextBounds("\uD83D\uDD19", 0,2, rect);
+        os.measureChr(mPaint, UndoButtonChr, rect);
         float h = rect.bottom - rect.top;
-        canvas.drawText("\uD83D\uDD19", 0, h, mPaint);
+
+        if (undoUsedUp) {
+            os.drawText(canvas, RestartButtonChr, 0, h, mPaint);
+        } else {
+            os.drawText(canvas, UndoButtonChr, 0, h, mPaint);
+        }
 
         // level select button
-        mPaint.getTextBounds("\uD83D\uDD22", 0,2, rect);
         h = rect.bottom - rect.top;
-        canvas.drawText("\uD83D\uDD22", lastWidth-rect.right, h, mPaint);
+        os.drawText(canvas, NumberButtonChr, lastWidth-rect.right, h, mPaint);
     }
 
     private void drawMotionHints(Canvas canvas) {
+        Paint p = mPaint;
         float scale = minDim / 6.0f;
         float wl = (lastWidth / 2.0f) - scale;
         float wr = (lastWidth / 2.0f) + scale;
         float ht = (lastHeight / 2.0f) - scale;
         float hb = (lastHeight / 2.0f) + scale;
-        canvas.drawRect(0, ht, wl,hb, mPaint); // L
-        canvas.drawRect(wr, ht, lastWidth,hb, mPaint); // R
-        canvas.drawRect(wl, 0, wr,ht, mPaint); // U
-        canvas.drawRect(wl, hb, wr,lastHeight, mPaint); // D
+        float tt = (lastHeight / 3.0f);
+        float tb = tt * 2.0f;
+
+        os.drawRect(p, canvas,0, tt, wl-10,tb); // L
+        os.drawRect(p, canvas,wr+10, tt, lastWidth,tb); // R
+        os.drawRect(p, canvas,wl, 0, wr,ht); // U
+        os.drawRect(p, canvas,wl, hb, wr,lastHeight); // D
     }
 
     public void drawLevel(final Canvas canvas){
-        mPaint.setTextSize(100);
+        os.setSize(mPaint, 100);
+
 
         int cx = lastWidth / 2;
         int cy = lastHeight / 2;
@@ -228,10 +242,10 @@ public class Level extends View {
     }
 
     private void drawStack(byte flags, float x, float y, Canvas canvas) {
-        if ((flags&fGoal)>0) canvas.drawText("\uD83D\uDD73", x, y, mPaint);
-        if ((flags&fBox)>0) canvas.drawText("\uD83D\uDCE6", x, y, mPaint);
-        if ((flags&fPlayer)>0) canvas.drawText("\uD83E\uDDCD", x, y, mPaint);
-        if ((flags&fWall)>0) canvas.drawText("\uD83E\uDDF1", x, y, mPaint);
+        if ((flags&fGoal)>0) os.drawText(canvas, GoalChr, x, y, mPaint);
+        if ((flags&fBox)>0) os.drawText(canvas,BoxChr, x, y, mPaint);
+        if ((flags&fPlayer)>0) os.drawText(canvas,PlayerChr, x, y, mPaint);
+        if ((flags&fWall)>0) os.drawText(canvas,WallChr, x, y, mPaint);
     }
 
 
@@ -272,11 +286,13 @@ public class Level extends View {
         float wr = (lastWidth / 2.0f) + scale;
         float ht = (lastHeight / 2.0f) - scale;
         float hb = (lastHeight / 2.0f) + scale;
+        float tt = (lastHeight / 3.0f);
+        float tb = tt * 2.0f;
 
         // split screen into 9 like #
         // centre and corners do nothing (to save ambiguous inputs)
 
-        if (upY >= ht && upY <= hb) {
+        if (upY >= tt && upY <= tb) {
             if (upX <= wl) movePlayer(-1, 0);
             if (upX >= wr) movePlayer(1, 0);
         }
@@ -289,8 +305,12 @@ public class Level extends View {
         // chop into fifths for small controls
         float minDim = Math.min(lastWidth, lastHeight) / 5.0f;
         if (upX <= minDim && upY <= minDim){
-            // pressed reset button
-            loadLevel(currentLevel);
+            // pressed reset/undo button
+            if (undoUsedUp) {
+                loadLevel(currentLevel);
+            } else {
+                loadUndoState();
+            }
         }
 
         if (upX >= lastWidth - minDim && upY <= minDim){
@@ -318,13 +338,15 @@ public class Level extends View {
             return;
         }
 
-        if ((target & fBox) == 0){
-            // either empty floor or unfilled goal. Just move
+        if ((target & fBox) == 0){// either empty floor or unfilled goal. Just move
+            copyUndo();
+
             // we don't update the *view* position, so it will animate to catch up
             level[py][px] &= ~fPlayer; // remove from old position
             px+=dx; py+=dy;
             level[py][px] |= fPlayer; // add to new position
             moves++;
+            undoUsedUp = false;
             return;
         }
 
@@ -351,6 +373,9 @@ public class Level extends View {
         }
 
         // YAY! we can push a box.
+        copyUndo();
+        undoUsedUp = false;
+
         // move the box and the player.
         // we don't update the *view* position, so it will animate to catch up
         level[py][px] &= ~fPlayer; // remove player from old position
@@ -363,6 +388,33 @@ public class Level extends View {
         moves++;
 
         checkLevelState();
+    }
+
+    /**
+     * Copy current level into undo, and clear the didUndo flag
+     */
+    private void copyUndo() {
+        for (int y=0; y < levelHeight; y++){
+            if (levelWidth >= 0) System.arraycopy(level[y], 0, undo[y], 0, levelWidth);
+        }
+    }
+
+
+    /**
+     * Copy undo state into current level
+     */
+    private void loadUndoState() {
+        for (int y=0; y < levelHeight; y++){
+            for (int x=0; x < levelWidth; x++) {
+                level[y][x] = undo[y][x];
+                if ((undo[y][x] & fPlayer) > 0){
+                    px = x; py = y;
+                }
+            }
+        }
+        moves--;
+        undoUsedUp = true;
+        invalidate();
     }
 
     private void checkLevelState() {
@@ -378,16 +430,7 @@ public class Level extends View {
         }
 
         // level was completed. Update best score if needed
-        String levelKey = ""+currentLevel;
-        SharedPreferences pref = parent.getSharedPreferences("scores", Context.MODE_PRIVATE);
-        int best = pref.getInt(levelKey, 0);
-
-        if (best < 1 || moves < best) { // yay! Best score.
-            // save the preference
-            SharedPreferences.Editor e = pref.edit();
-            e.putInt(levelKey, moves);
-            e.apply();
-        }
+        os.setScore(parent, currentLevel, moves);
     }
 
     // if it's a small move, ignore. Otherwise, look around

@@ -6,6 +6,7 @@
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
 -optimizations *
+-optimizations !method/inlining/*
 -optimizationpasses 5
 -overloadaggressively
 

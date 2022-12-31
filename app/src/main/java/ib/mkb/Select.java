@@ -4,6 +4,7 @@ import android.annotation.SuppressLint;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Rect;
+import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
 
@@ -83,34 +84,59 @@ public class Select extends View {
         os.drawText(canvas,txt, w, subH, mPaint);
     }
 
-
     @SuppressLint("ClickableViewAccessibility")
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         if (event.getAction() == MotionEvent.ACTION_UP) {
             upX = event.getX();
             upY = event.getY();
-            touchLift();
+            float w3 = lastWidth / 3.0f;
+            float h3 = lastHeight / 3.0f;
+
+            if (upX >= w3 && upX <= 2*w3) {
+                if (upY <= h3) selectedLevel--;
+                else if (upY >= 2*h3) selectedLevel++;
+                else parent.switchToLevel(selectedLevel);
+            }
+            if (selectedLevel < 0) selectedLevel = 0;
+            if (selectedLevel > 96) selectedLevel = 96;
+
+            // save the preference
+            os.setLastLevel(parent, selectedLevel);
         }
 
         invalidate(); // draw a frame
         return true; // event handled
     }
 
-
-    private void touchLift() {
-        float w3 = lastWidth / 3.0f;
-        float h3 = lastHeight / 3.0f;
-
-        if (upX >= w3 && upX <= 2*w3) {
-            if (upY <= h3) selectedLevel--;
-            else if (upY >= 2*h3) selectedLevel++;
-            else parent.switchToLevel(selectedLevel);
+    @Override
+    public boolean onKeyUp(int keyCode, KeyEvent event) {
+        switch (keyCode){
+            case KeyEvent.KEYCODE_DPAD_CENTER:
+            case KeyEvent.KEYCODE_ENTER:
+            case KeyEvent.KEYCODE_SPACE:
+                parent.switchToLevel(selectedLevel);
+                invalidate(); // draw a frame
+                return true;
         }
+
+        return false;
+    }
+
+    @Override
+    public boolean onTrackballEvent(MotionEvent event){
+        upY = event.getY();
+        if      (upY < -0.5) selectedLevel--;
+        else if (upY >  0.5) selectedLevel++;
+
         if (selectedLevel < 0) selectedLevel = 0;
         if (selectedLevel > 96) selectedLevel = 96;
 
         // save the preference
         os.setLastLevel(parent, selectedLevel);
+
+        invalidate(); // draw a frame
+        return true;
     }
+
 }

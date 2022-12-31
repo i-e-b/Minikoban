@@ -5,8 +5,8 @@ import android.content.res.AssetManager;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Rect;
+import android.view.KeyEvent;
 import android.view.MotionEvent;
-import android.view.View;
 
 import java.io.BufferedReader;
 import java.io.InputStream;
@@ -15,7 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @SuppressLint("ViewConstructor")
-public class Level extends View {
+public class Level extends BaseView {
 
     public static final String NumberButtonChr = "\uD83D\uDD22";
     public static final String GoalChr = "\uD83D\uDD73";
@@ -28,6 +28,7 @@ public class Level extends View {
 
     private final Paint mPaint = new Paint();
     private int lastHeight, lastWidth, minDim; // dimensions of screen last time we did a paint.
+    private int tileDrawSize, tileSpacing, ctrlDrawSize;
 
     private int px,py; // player position
     private float vx,vy; // view position (should move toward player)
@@ -54,7 +55,6 @@ public class Level extends View {
     private static final byte fGoal = 1<<2;
     private static final byte fBox = 1<<3;
 
-    private static final int tileScale = 110; // size of tile grid (tune to fit font)
     private final AssetManager assets;
     private final Main parent;
 
@@ -148,6 +148,7 @@ public class Level extends View {
         lastWidth = canvas.getWidth();
         lastHeight = canvas.getHeight();
         minDim = Math.min(lastWidth, lastHeight);
+        tileDrawSize = minDim / 12;
 
         int c1 = 200, c2 = 220, c3 = 70;
         // clear background
@@ -168,7 +169,7 @@ public class Level extends View {
         os.drawText(canvas, moves+" moves", 10, lastHeight - 50, p);
 
         if (levelComplete) {
-            os.setSize(p, 450);
+            os.setSize(p, Math.min(minDim / 3, 450));
             Rect rect = new Rect();
             String msg = DancingPlayerChr;
             os.measureText(p, msg, rect);
@@ -187,24 +188,22 @@ public class Level extends View {
         }
     }
 
-
     private void drawGeneralControls(Canvas canvas){
-        os.setSize(mPaint, 150);
+        os.setSize(mPaint, (int)(tileDrawSize*1.25));
         Rect rect = new Rect();
 
         // draw reset level button
         os.measureChr(mPaint, UndoButtonChr, rect);
         float h = rect.bottom - rect.top;
+        ctrlDrawSize = Math.max(rect.width(), rect.height());
 
-        if (undoUsedUp) {
+        if (moves < 1) {
+            os.drawText(canvas, NumberButtonChr, 0, h, mPaint);
+        } else if (undoUsedUp) {
             os.drawText(canvas, RestartButtonChr, 0, h, mPaint);
         } else {
             os.drawText(canvas, UndoButtonChr, 0, h, mPaint);
         }
-
-        // level select button
-        h = rect.bottom - rect.top;
-        os.drawText(canvas, NumberButtonChr, lastWidth-rect.right, h, mPaint);
     }
 
     private void drawMotionHints(Canvas canvas) {
@@ -224,8 +223,8 @@ public class Level extends View {
     }
 
     public void drawLevel(final Canvas canvas){
-        os.setSize(mPaint, 100);
-
+        os.setSize(mPaint, tileDrawSize);
+        tileSpacing = os.measureChrSize(mPaint, WallChr);
 
         int cx = lastWidth / 2;
         int cy = lastHeight / 2;
@@ -234,8 +233,8 @@ public class Level extends View {
             for (int x=0; x < levelWidth; x++){
                 // draw level centred around the view point as grid co-ords
                 // view will drift toward player over time
-                float tx = cx + ((x - vx - 0.5f) * tileScale);
-                float ty = cy + ((y - vy + 0.25f) * tileScale);
+                float tx = cx + ((x - vx - 0.5f) * tileSpacing);
+                float ty = cy + ((y - vy + 0.25f) * tileSpacing);
                 drawStack(level[y][x], tx,ty, canvas);
             }
         }
@@ -248,10 +247,55 @@ public class Level extends View {
         if ((flags&fWall)>0) os.drawText(canvas,WallChr, x, y, mPaint);
     }
 
+    private boolean repeatLock = false;
 
-    @SuppressLint("ClickableViewAccessibility")
     @Override
-    public boolean onTouchEvent(MotionEvent event) {
+    public boolean keyEvent(KeyEvent event) {
+        int action = event.getAction();
+        int keyCode = event.getKeyCode();
+        boolean isDown = action == KeyEvent.ACTION_DOWN;
+        boolean isUp = action == KeyEvent.ACTION_UP;
+        if (event.isLongPress() || event.getRepeatCount() > 0) return true; // don't auto-repeat
+
+        switch (keyCode){
+            case KeyEvent.KEYCODE_DPAD_CENTER:
+            case KeyEvent.KEYCODE_ENTER:
+            case KeyEvent.KEYCODE_SPACE:
+                // ignore
+                break;
+
+            case KeyEvent.KEYCODE_BACK:
+            case KeyEvent.KEYCODE_ESCAPE:
+                if (isUp) repeatLock = false;
+                else if (isDown && !repeatLock) tryUndo();
+                break;
+
+            case KeyEvent.KEYCODE_DPAD_DOWN:
+                if (isUp) repeatLock = false;
+                else if (isDown && !repeatLock) movePlayer(0, 1);
+                break;
+
+            case KeyEvent.KEYCODE_DPAD_UP:
+                if (isUp) repeatLock = false;
+                else if (isDown && !repeatLock) movePlayer(0, -1);
+                break;
+
+            case KeyEvent.KEYCODE_DPAD_LEFT:
+                if (isUp) repeatLock = false;
+                else if (isDown && !repeatLock) movePlayer(-1, 0);
+                break;
+
+            case KeyEvent.KEYCODE_DPAD_RIGHT:
+                if (isUp) repeatLock = false;
+                else if (isDown && !repeatLock) movePlayer(1, 0);
+                break;
+        }
+        invalidate(); // draw a frame
+        return true;
+    }
+
+    @Override
+    public boolean motionEvent(MotionEvent event) {
         switch (event.getAction()) {
             case MotionEvent.ACTION_DOWN:
                 touchDown = true;
@@ -302,20 +346,23 @@ public class Level extends View {
             if (upY >= hb) movePlayer(0, 1);
         }
 
-        // chop into fifths for small controls
-        float minDim = Math.min(lastWidth, lastHeight) / 5.0f;
-        if (upX <= minDim && upY <= minDim){
-            // pressed reset/undo button
-            if (undoUsedUp) {
-                loadLevel(currentLevel);
-            } else {
-                loadUndoState();
-            }
+        // Undo / Restart / Select
+        if (upX <= ctrlDrawSize && upY <= ctrlDrawSize*2.0f){
+            tryUndo();
+        }
+    }
+
+    private void tryUndo() {
+        // pressed reset/undo button
+
+        if (moves == 0) {
+            parent.showSelectionScreen();
         }
 
-        if (upX >= lastWidth - minDim && upY <= minDim){
-            // pressed level select button
-            parent.showSelectionScreen();
+        if (undoUsedUp) {
+            loadLevel(currentLevel);
+        } else {
+            loadUndoState();
         }
     }
 
@@ -443,7 +490,8 @@ public class Level extends View {
 
         // look around the player
         didScroll = true;
-        vx = px + (dx / tileScale)*2;
-        vy = py + (dy / tileScale)*2;
+        vx = px + (dx / tileSpacing)*2;
+        vy = py + (dy / tileSpacing)*2;
     }
+
 }

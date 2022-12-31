@@ -6,14 +6,11 @@ import android.graphics.Paint;
 import android.graphics.Rect;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
-import android.view.View;
 
 @SuppressLint("ViewConstructor")
-public class Select extends View {
+public class Select extends BaseView {
     private final Paint mPaint = new Paint();
     private final Main parent;
-
-    private float upX, upY; // touch lift position
 
     private int selectedLevel;
 
@@ -38,6 +35,7 @@ public class Select extends View {
         lastWidth = canvas.getWidth();
         lastHeight = canvas.getHeight();
 
+        int size = Math.min(400, lastHeight / 5);
 
         int c1 = 200, c3 = 70;
         // clear background
@@ -48,7 +46,7 @@ public class Select extends View {
         os.setGrey(mPaint, c3);
 
         Rect rect = new Rect();
-        os.setSize(mPaint,400);
+        os.setSize(mPaint,size);
 
         // up arrow (previous level)
         String txt = "⬆️";
@@ -84,59 +82,64 @@ public class Select extends View {
         os.drawText(canvas,txt, w, subH, mPaint);
     }
 
-    @SuppressLint("ClickableViewAccessibility")
     @Override
-    public boolean onTouchEvent(MotionEvent event) {
-        if (event.getAction() == MotionEvent.ACTION_UP) {
-            upX = event.getX();
-            upY = event.getY();
-            float w3 = lastWidth / 3.0f;
-            float h3 = lastHeight / 3.0f;
+    public boolean motionEvent(MotionEvent event) {
+        if (event.getAction() != MotionEvent.ACTION_UP) return true;
 
-            if (upX >= w3 && upX <= 2*w3) {
-                if (upY <= h3) selectedLevel--;
-                else if (upY >= 2*h3) selectedLevel++;
-                else parent.switchToLevel(selectedLevel);
-            }
-            if (selectedLevel < 0) selectedLevel = 0;
-            if (selectedLevel > 96) selectedLevel = 96;
+        float upX = event.getX();
+        // touch lift position
+        float upY = event.getY();
+        float w3 = lastWidth / 3.0f;
+        float h3 = lastHeight / 3.0f;
 
-            // save the preference
-            os.setLastLevel(parent, selectedLevel);
-        }
+        if (!(upX >= w3) || !(upX <= 2 * w3)) return true;
 
-        invalidate(); // draw a frame
+        if (upY <= h3) levelUp();
+        else if (upY >= 2*h3) levelDown();
+        else select();
+
         return true; // event handled
     }
 
     @Override
-    public boolean onKeyUp(int keyCode, KeyEvent event) {
+    public boolean keyEvent(KeyEvent event) {
+        if (event.getAction() == KeyEvent.ACTION_DOWN) return true;
+        int keyCode = event.getKeyCode();
         switch (keyCode){
             case KeyEvent.KEYCODE_DPAD_CENTER:
             case KeyEvent.KEYCODE_ENTER:
             case KeyEvent.KEYCODE_SPACE:
-                parent.switchToLevel(selectedLevel);
-                invalidate(); // draw a frame
+                select();
                 return true;
-        }
 
+            case KeyEvent.KEYCODE_DPAD_DOWN:{
+                levelDown();
+                return true;
+            }
+
+            case KeyEvent.KEYCODE_DPAD_UP:{
+                levelUp();
+                return true;
+            }
+        }
         return false;
     }
 
-    @Override
-    public boolean onTrackballEvent(MotionEvent event){
-        upY = event.getY();
-        if      (upY < -0.5) selectedLevel--;
-        else if (upY >  0.5) selectedLevel++;
-
+    private void levelUp(){
+        selectedLevel--;
         if (selectedLevel < 0) selectedLevel = 0;
         if (selectedLevel > 96) selectedLevel = 96;
-
-        // save the preference
         os.setLastLevel(parent, selectedLevel);
-
-        invalidate(); // draw a frame
-        return true;
+        invalidate();
     }
-
+    private void levelDown(){
+        selectedLevel++;
+        if (selectedLevel < 0) selectedLevel = 0;
+        if (selectedLevel > 96) selectedLevel = 96;
+        os.setLastLevel(parent, selectedLevel);
+        invalidate();
+    }
+    private void select(){
+        parent.switchToLevel(selectedLevel);
+    }
 }

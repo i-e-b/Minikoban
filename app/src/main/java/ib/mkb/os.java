@@ -32,6 +32,12 @@ public class os {
         mPaint.getTextBounds(txt, 0,2, rect);
     }
 
+    public static int measureChrSize(Paint mPaint, String txt) {
+        Rect rect = new Rect();
+        mPaint.getTextBounds(txt, 0,2, rect);
+        return (Math.abs(rect.top) + Math.abs(rect.right)) / 2;
+    }
+
     private static SharedPreferences getPref(Context c){
         return c.getSharedPreferences("scores", Context.MODE_PRIVATE);
     }

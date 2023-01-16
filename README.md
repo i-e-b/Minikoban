@@ -6,6 +6,11 @@ A little Sokoban game for Android
 1. Because it's a fun game
 2. To see how small I can make it (apk size)
 
+## TO-DO
+
+* [ ] Save current level and restore on open.
+* [ ] On level complete, a single 'back' returns to level select.
+
 ## Level sources
 
 ### Original levels and other details
